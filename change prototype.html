@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>LPU Campus Map & Block Navigator</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+     crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+     crossorigin=""></script>
+  
+  <style>
+    body { 
+      margin: 0; 
+      padding: 0; 
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #f8fafc;
+      color: #0f172a;
+    }
+    .top-content {
+      height: 45vh;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 16px 20px;
+      box-sizing: border-box;
+      overflow-y: auto;
+    }
+    h1 {
+      font-size: 1.35rem;
+      margin: 0 0 4px 0;
+    }
+    .subtitle {
+      font-size: 0.85rem;
+      color: #64748b;
+      margin: 0 0 14px 0;
+    }
+    .route-box {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 10px;
+      background: #ffffff;
+      padding: 14px;
+      border-radius: 10px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+    }
+    .input-group {
+      flex: 1;
+      min-width: 180px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .input-group label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #475569;
+      letter-spacing: 0.5px;
+    }
+    select {
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+      font-size: 0.9rem;
+      background: #f8fafc;
+      color: #0f172a;
+      cursor: pointer;
+    }
+    select:focus {
+      outline: none;
+      border-color: #2563eb;
+      background: #ffffff;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+    }
+    button {
+      padding: 8px 14px;
+      border-radius: 6px;
+      border: none;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-go {
+      background: #e11d48;
+      color: #ffffff;
+    }
+    .btn-go:hover {
+      background: #be123c;
+    }
+    .btn-swap {
+      background: #e2e8f0;
+      color: #334155;
+    }
+    .btn-swap:hover {
+      background: #cbd5e1;
+    }
+    #route-info {
+      margin-top: 12px;
+      padding: 10px 14px;
+      background: #eff6ff;
+      border-left: 4px solid #2563eb;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      color: #1e3a8a;
+    }
+    #map { 
+      height: 50vh;
+      width: 80%;
+      max-width: 800px;
+      margin: 0 auto;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="top-content">
+    <h1>Lovely Professional University (LPU)</h1>
+    <p class="subtitle">Select your starting block and destination block to navigate across campus.</p>
+
+    <div class="route-box">
+      <div class="input-group">
+        <label for="fromBlock">From (Starting Block)</label>
+        <select id="fromBlock"></select>
+      </div>
+
+      <div class="input-group">
+        <label for="toBlock">To (Destination Block)</label>
+        <select id="toBlock"></select>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn-swap" onclick="swapBlocks()" title="Swap From and To">⇄ Swap</button>
+        <button class="btn-go" onclick="showRoute()">Find Route</button>
+      </div>
+    </div>
+
+    <div id="route-info">
+      Choose a <b>From</b> and <b>To</b> block above, then click <b>Find Route</b>.
+    </div>
+  </div>
+
+  <div id="map"></div>
+
+  <script>
+    const lpuCoords = [31.2535, 75.7042];
+
+    // 1. Restricted LPU Bounds
+    const lpuBounds = L.latLngBounds(
+      [31.2430, 75.6915],
+      [31.2625, 75.7155]
+    );
+
+    const map = L.map('map', {
+      center: lpuCoords,
+      zoom: 15,
+      minZoom: 14,
+      maxZoom: 19,
+      maxBounds: lpuBounds,
+      maxBoundsViscosity: 1.0
+    });
+
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
+
+    // 2. Campus Perimeter Cutout Mask
+    const outerWorld = [
+      [30.0, 74.0],
+      [30.0, 77.0],
+      [33.0, 77.0],
+      [33.0, 74.0]
+    ];
+
+    const lpuPerimeter = [
+      [31.2458, 75.6982],
+      [31.2468, 75.7095],
+      [31.2535, 75.7138],
+      [31.2608, 75.7105],
+      [31.2610, 75.7005],
+      [31.2578, 75.6958],
+      [31.2505, 75.6952]
+    ];
+
+    L.polygon([outerWorld, lpuPerimeter], {
+      color: '#e11d48',
+      weight: 2.5,
+      fillColor: '#0f172a',
+      fillOpacity: 0.65,
+      interactive: false
+    }).addTo(map);
+
+    // 3. LPU Campus Blocks Directory
+    const lpuBlocks = [
+      { id: "Uni-hospital]", name: "Uni-Hospital– ", coords: [31.258024242602268, 75.70681769705185] },
+      { id: "1-12", name: "Blocks 1–12 – Main Admin & Exam Wing", coords: [31.2528, 75.7042] },
+      { id: "13", name: "Block 13 – Division of Student Welfare (DSW)", coords: [31.2534, 75.7050] },
+      { id: "14", name: "Block 14 – Mittal School of Business", coords: [31.2526, 75.7055] },
+      { id: "15", name: "Block 15 – Uni-Mall & Food Court", coords: [31.2532, 75.7062] },
+      { id: "16-17", name: "Blocks 16–17 – Hotel Management & Tourism", coords: [31.2538, 75.7066] },
+      { id: "18-20", name: "Blocks 18–20 – Law, Education & Humanities", coords: [31.2544, 75.7058] },
+      { id: "25-28", name: "Blocks 25–28 – Architecture, Design & Fine Arts", coords: [31.2548, 75.7050] },
+      { id: "33-34", name: "Blocks 33–34 – Computer Science (CSE) & BCA/MCA", coords: [31.2546, 75.7036] },
+      { id: "35-36", name: "Blocks 35–36 – Electronics & Electrical (ECE/EEE)", coords: [31.2552, 75.7040] },
+      { id: "37", name: "Block 37 – Central Library & SDM Auditorium", coords: [31.2541, 75.7045] },
+      { id: "38", name: "Block 38 – CSE & Division of Research (DRD)", coords: [31.2557, 75.7034] },
+      { id: "39-40", name: "Blocks 39–40 – Indoor Sports Complex & Pool", coords: [31.2560, 75.7048] },
+      { id: "41-43", name: "Blocks 41–43 – Mechanical, Aerospace & Civil Eng.", coords: [31.2558, 75.7018] },
+      { id: "55-56", name: "Blocks 55–56 – Agriculture & Biosciences", coords: [31.2572, 75.7002] },
+      { id: "57-58", name: "Blocks 57–58 – Pharmacy & Physiotherapy", coords: [31.2578, 75.6995] },
+      { id: "HOSP", name: "Uni-Hospital (24/7 Medical Care)", coords: [31.2515, 75.7076] },
+      { id: "BH1-4", name: "Boys' Hostels (BH-1 to BH-4)", coords: [31.2552, 75.7082] },
+      { id: "BH5-8", name: "Boys' Hostels (BH-5 to BH-8)", coords: [31.2586, 75.7068] },
+      { id: "GH1-6", name: "Girls' Hostels (GH-1 to GH-6)", coords: [31.2524, 75.7088] }
+    ];
+
+    const fromSelect = document.getElementById("fromBlock");
+    const toSelect = document.getElementById("toBlock");
+    const markers = {};
+
+    // Populate dropdowns and add subtle markers for all blocks
+    lpuBlocks.forEach(block => {
+      fromSelect.add(new Option(block.name, block.id));
+      toSelect.add(new Option(block.name, block.id));
+
+      const marker = L.circleMarker(block.coords, {
+        radius: 6,
+        fillColor: "#2563eb",
+        color: "#ffffff",
+        weight: 2,
+        fillOpacity: 0.9
+      }).addTo(map).bindPopup(`<b>${block.name}</b>`);
+
+      markers[block.id] = marker;
+    });
+
+    // Set sensible defaults (Main Gate -> CSE Block 33-34)
+    fromSelect.value = "32";
+    toSelect.value = "33-34";
+
+    let activeRouteLayer = L.layerGroup().addTo(map);
+
+    function swapBlocks() {
+      const temp = fromSelect.value;
+      fromSelect.value = toSelect.value;
+      toSelect.value = temp;
+      showRoute();
+    }
+
+    function showRoute() {
+      const start = lpuBlocks.find(b => b.id === fromSelect.value);
+      const end = lpuBlocks.find(b => b.id === toSelect.value);
+      const infoBox = document.getElementById("route-info");
+
+      if (!start || !end) return;
+
+      if (start.id === end.id) {
+        infoBox.innerHTML = `You are already at <b>${start.name}</b>.`;
+        map.flyTo(start.coords, 17);
+        markers[start.id].openPopup();
+        return;
+      }
+
+      activeRouteLayer.clearLayers();
+
+      // Draw route line between selected blocks
+      const routeLine = L.polyline([start.coords, end.coords], {
+        color: "#e11d48",
+        weight: 5,
+        dashArray: "10, 8"
+      }).addTo(activeRouteLayer);
+
+      // Highlight Start (Green) and Destination (Red) pins
+      L.marker(start.coords)
+        .addTo(activeRouteLayer)
+        .bindPopup(`<b>Start:</b> ${start.name}`);
+
+      const destMarker = L.marker(end.coords)
+        .addTo(activeRouteLayer)
+        .bindPopup(`<b>Destination:</b> ${end.name}`)
+        .openPopup();
+
+      // Zoom map smoothly to frame the route
+      map.fitBounds(routeLine.getBounds(), { padding: [50, 50] });
+
+      // Calculate walking distance (~1.3x straight line for campus paths) & time (80m/min)
+      const straightMeters = map.distance(start.coords, end.coords);
+      const walkMeters = Math.round(straightMeters * 1.3);
+      const walkMinutes = Math.max(1, Math.round(walkMeters / 80));
+
+      infoBox.innerHTML = `
+        <b>From:</b> ${start.name.split("–")[0].trim()} &rarr; 
+        <b>To:</b> ${end.name.split("–")[0].trim()}<br>
+        Estimated Walk: <b>~${walkMeters} meters</b> (<b>${walkMinutes} min</b>)
+      `;
+    }
+  </script>
+</body>
+</html>
