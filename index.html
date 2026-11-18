@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>LPU Campus Map & Block Navigator</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+     crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+     crossorigin=""></script>
+  
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body { 
+      margin: 0; 
+      padding: 0; 
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #f1f5f9;
+      color: #0f172a;
+    }
+
+    /* 1. Sticky Top Navigation Bar */
+    .navbar {
+      position: sticky;
+      top: 0;
+      z-index: 1100;
+      background: #0f172a;
+      color: #ffffff;
+      border-bottom: 1px solid #1e293b;
+      padding: 12px 24px;
+    }
+
+    .nav-inner {
+      max-width: 1220px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-logo {
+      background: #e11d48;
+      color: #ffffff;
+      font-weight: 800;
+      font-size: 0.85rem;
+      padding: 5px 9px;
+      border-radius: 6px;
+      letter-spacing: 0.5px;
+    }
+
+    .brand-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      font-size: 0.85rem;
+    }
+
+    .nav-links a {
+      color: #cbd5e1;
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.15s;
+    }
+
+    .nav-links a:hover {
+      color: #ffffff;
+    }
+
+    .nav-badge {
+      background: #1e293b;
+      color: #38bdf8;
+      border: 1px solid #334155;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    /* Quick Campus Stats Strip */
+    .stats-strip {
+      max-width: 1220px;
+      margin: 16px auto 0 auto;
+      padding: 0 20px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    .stat-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 12px 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    }
+
+    .stat-card .stat-value {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: #0f172a;
+    }
+
+    .stat-card .stat-label {
+      font-size: 0.76rem;
+      color: #64748b;
+      margin-top: 2px;
+    }
+
+    /* Two-Column Main Layout */
+    .main-layout {
+      display: flex;
+      gap: 20px;
+      max-width: 1220px;
+      margin: 0 auto;
+      padding: 16px 20px 28px 20px;
+      align-items: flex-start;
+    }
+
+    .navigator-column {
+      flex: 2;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .faq-sidebar {
+      flex: 1;
+      min-width: 280px;
+      max-width: 360px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 16px 18px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      position: sticky;
+      top: 68px;
+      max-height: calc(100vh - 88px);
+      overflow-y: auto;
+    }
+
+    .faq-sidebar h2 {
+      font-size: 1.05rem;
+      margin: 0;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .faq-subtitle {
+      font-size: 0.8rem;
+      color: #64748b;
+      margin: 0 0 4px 0;
+    }
+
+    details.faq-item {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      background: #f8fafc;
+      padding: 10px 12px;
+      transition: background 0.15s;
+    }
+
+    details.faq-item[open] {
+      background: #ffffff;
+      border-color: #cbd5e1;
+    }
+
+    details.faq-item summary {
+      font-size: 0.86rem;
+      font-weight: 600;
+      color: #1e293b;
+      cursor: pointer;
+      list-style: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    details.faq-item summary::-webkit-details-marker {
+      display: none;
+    }
+
+    details.faq-item summary::after {
+      content: "+";
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #2563eb;
+      flex-shrink: 0;
+    }
+
+    details.faq-item[open] summary::after {
+      content: "−";
+      color: #e11d48;
+    }
+
+    details.faq-item p {
+      margin: 8px 0 0 0;
+      font-size: 0.82rem;
+      line-height: 1.45;
+      color: #475569;
+    }
+
+    /* Top Controls & Map */
+    .top-content {
+      margin-bottom: 14px;
+    }
+    h1 {
+      font-size: 1.35rem;
+      margin: 0 0 4px 0;
+    }
+    .subtitle {
+      font-size: 0.85rem;
+      color: #64748b;
+      margin: 0 0 12px 0;
+    }
+
+    /* 2. Popular Routes Quick-Chips Bar */
+    .popular-routes {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 12px;
+    }
+
+    .popular-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #64748b;
+      letter-spacing: 0.4px;
+      margin-right: 2px;
+    }
+
+    .route-chip {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      color: #1e293b;
+      padding: 5px 11px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .route-chip:hover {
+      background: #eff6ff;
+      border-color: #2563eb;
+      color: #1d4ed8;
+    }
+
+    .route-box {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 10px;
+      background: #ffffff;
+      padding: 14px;
+      border-radius: 10px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+    }
+    .input-group {
+      flex: 1;
+      min-width: 180px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .input-group label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #475569;
+      letter-spacing: 0.5px;
+    }
+    .btn-gps {
+      background: #eff6ff;
+      color: #2563eb;
+      border: 1px solid #bfdbfe;
+      padding: 2px 8px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .btn-gps:hover {
+      background: #dbeafe;
+    }
+    select {
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+      font-size: 0.9rem;
+      background: #f8fafc;
+      color: #0f172a;
+      cursor: pointer;
+    }
+    select:focus {
+      outline: none;
+      border-color: #2563eb;
+      background: #ffffff;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+    }
+    button {
+      padding: 8px 14px;
+      border-radius: 6px;
+      border: none;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-go {
+      background: #e11d48;
+      color: #ffffff;
+    }
+    .btn-go:hover {
+      background: #be123c;
+    }
+    .btn-swap {
+      background: #e2e8f0;
+      color: #334155;
+    }
+    .btn-swap:hover {
+      background: #cbd5e1;
+    }
+    #route-info {
+      margin-top: 12px;
+      padding: 10px 14px;
+      background: #eff6ff;
+      border-left: 4px solid #2563eb;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      color: #1e3a8a;
+    }
+    #map { 
+      height: 440px;
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid #cbd5e1;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+
+    /* 4. Selected Destination Spotlight Card */
+    .spotlight-card {
+      margin-top: 16px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 16px 18px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+    }
+
+    .spotlight-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 10px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .spotlight-header h3 {
+      margin: 0;
+      font-size: 1.05rem;
+      color: #0f172a;
+    }
+
+    .spotlight-tag {
+      background: #fef2f2;
+      color: #e11d48;
+      border: 1px solid #fecdd3;
+      font-size: 0.74rem;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 999px;
+      text-transform: uppercase;
+    }
+
+    .spotlight-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .spotlight-item {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+
+    .spotlight-item strong {
+      display: block;
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      color: #64748b;
+      margin-bottom: 4px;
+      letter-spacing: 0.4px;
+    }
+
+    .spotlight-item span {
+      font-size: 0.85rem;
+      color: #1e293b;
+      font-weight: 500;
+      line-height: 1.35;
+      display: block;
+    }
+
+    /* Popup Action Buttons */
+    .popup-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .popup-btn {
+      flex: 1;
+      padding: 4px 8px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      border-radius: 4px;
+      cursor: pointer;
+      border: 1px solid #cbd5e1;
+      background: #f8fafc;
+      color: #0f172a;
+    }
+    .popup-btn:hover {
+      background: #e2e8f0;
+    }
+    .popup-btn-dest {
+      background: #e11d48;
+      color: #ffffff;
+      border-color: #e11d48;
+    }
+    .popup-btn-dest:hover {
+      background: #be123c;
+    }
+
+    /* Responsive Adjustments */
+    @media (max-width: 860px) {
+      .stats-strip {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .main-layout {
+        flex-direction: column;
+      }
+      .faq-sidebar {
+        position: static;
+        max-width: 100%;
+        max-height: none;
+      }
+      .spotlight-grid {
+        grid-template-columns: 1fr;
+      }
+      #map {
+        height: 360px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 1. Top Navigation Bar -->
+  <header class="navbar">
+    <div class="nav-inner">
+      <div class="brand">
+        <span class="brand-logo">LPU NAV</span>
+        <span class="brand-title">Campus Block &amp; Walkway Navigator</span>
+      </div>
+      <nav class="nav-links">
+        <a href="#navigator-section">Route Finder</a>
+        <a href="#spotlight-section">Destination Info</a>
+        <a href="#faq-section">FAQs</a>
+        <span class="nav-badge">36 Campus Zones Mapped</span>
+      </nav>
+    </div>
+  </header>
+
+  <!-- 1B. Quick Campus Stats Strip -->
+  <section class="stats-strip">
+    <div class="stat-card">
+      <div class="stat-value">600+ Acres</div>
+      <div class="stat-label">Phagwara Campus Perimeter</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">Road-Snapped</div>
+      <div class="stat-label">OSRM Pedestrian Pathfinding</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">~80 m/min</div>
+      <div class="stat-label">Average Student Walk Pace</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">₹10 – ₹20</div>
+      <div class="stat-label">Campus E-Rickshaw Shuttle</div>
+    </div>
+  </section>
+
+  <div class="main-layout">
+    <!-- Left Column: Navigator, Map & Destination Spotlight -->
+    <div class="navigator-column" id="navigator-section">
+      <div class="top-content">
+        <h1>Plan Your Campus Walk</h1>
+        <p class="subtitle">Pick a quick route below, select blocks from the dropdown, or click any blue pin on the map.</p>
+
+        <!-- 2. One-Click Popular Routes Bar -->
+        <div class="popular-routes">
+          <span class="popular-label">Popular:</span>
+          <button type="button" class="route-chip" onclick="quickRoute('Block-32', '33-34')">Main Gate &rarr; Block 33-34 (CSE)</button>
+          <button type="button" class="route-chip" onclick="quickRoute('BH1', 'unimall')">BH-1 &rarr; Uni-Mall</button>
+          <button type="button" class="route-chip" onclick="quickRoute('33-34', '35-37')">CSE &rarr; Central Library</button>
+          <button type="button" class="route-chip" onclick="quickRoute('GH- 1-4', 'school_of_business')">GH 1-4 &rarr; Block 14 (Business)</button>
+        </div>
+
+        <div class="route-box">
+          <div class="input-group">
+            <div class="label-row">
+              <label for="fromBlock">From (Start)</label>
+              <button type="button" class="btn-gps" onclick="locateUser()">📍 My Location</button>
+            </div>
+            <select id="fromBlock"></select>
+          </div>
+
+          <div class="input-group">
+            <label for="toBlock">To (Destination)</label>
+            <select id="toBlock" onchange="updateSpotlight(this.value)"></select>
+          </div>
+
+          <div class="btn-group">
+            <button class="btn-swap" onclick="swapBlocks()" title="Swap From and To">⇄ Swap</button>
+            <button class="btn-go" onclick="showRoute()">Find Route</button>
+          </div>
+        </div>
+
+        <div id="route-info">
+          Choose a <b>From</b> and <b>To</b> block above (or click any blue pin on the map), then click <b>Find Route</b>.
+        </div>
+      </div>
+
+      <div id="map"></div>
+
+      <!-- 4. Selected Destination Spotlight Card -->
+      <section class="spotlight-card" id="spotlight-section">
+        <div class="spotlight-header">
+          <h3 id="spot-title">Blocks 33–34 – Computer Science (CSE)</h3>
+          <span class="spotlight-tag" id="spot-tag">Destination Details</span>
+        </div>
+        <div class="spotlight-grid">
+          <div class="spotlight-item">
+            <strong>Key Facilities</strong>
+            <span id="spot-facilities">CSE/BCA/MCA lecture halls, programming labs, and faculty cabins.</span>
+          </div>
+          <div class="spotlight-item">
+            <strong>Nearest Transit &amp; Landmark</strong>
+            <span id="spot-landmark">Beside CSE Parking, RoboPark, and Central Library (Block 37).</span>
+          </div>
+          <div class="spotlight-item">
+            <strong>Navigation Tip</strong>
+            <span id="spot-tip">Use the central atrium stairs or side lifts; check wing boards before heading up.</span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Right Column: Campus FAQs -->
+    <aside class="faq-sidebar" id="faq-section">
+      <h2>Campus Navigation FAQs</h2>
+      <p class="faq-subtitle">Quick answers for freshers &amp; visitors</p>
+
+      <details class="faq-item" open>
+        <summary>How do I read LPU room numbers (e.g., 34-402)?</summary>
+        <p>The number before the hyphen is the <b>Block Number</b> (Block 34). The first digit after the hyphen is the <b>Floor</b> (4th floor), and the remaining digits indicate the room or lab number.</p>
+      </details>
+
+      <details class="faq-item">
+        <summary>How do I use this map without scrolling dropdowns?</summary>
+        <p>Click any blue circle directly on the map and tap <b>Set Start</b> or <b>Set Destination</b> inside the popup to plot your route immediately.</p>
+      </details>
+
+      <details class="faq-item">
+        <summary>When should I walk vs. take an e-rickshaw?</summary>
+        <p>If your estimated distance is under <b>600 meters</b> (about 7–8 minutes), walking is usually faster than waiting in queue for an e-rickshaw between lectures.</p>
+      </details>
+
+      <details class="faq-item">
+        <summary>Why does "My Location" say I'm outside campus?</summary>
+        <p>To keep the map focused on LPU, live GPS routing only activates inside the campus boundary. Make sure your device's high-accuracy location permission is enabled.</p>
+      </details>
+
+      <details class="faq-item">
+        <summary>Where do I go for ID cards, attendance, or admin queries?</summary>
+        <p>Head to <b>Blocks 29–32</b> near the Main Gate Plaza for admissions, fee counters, and administrative helpdesks, or <b>Block 13</b> for Student Welfare (DSW).</p>
+      </details>
+
+      <details class="faq-item">
+        <summary>How are walking routes calculated?</summary>
+        <p>The navigator queries OpenStreetMap pedestrian pathways to follow actual campus roads and walkways rather than cutting through buildings.</p>
+      </details>
+    </aside>
+  </div>
+
+  <script>
+    const lpuCoords = [31.2535, 75.7042];
+
+    // 1. Restricted LPU Bounds
+    const lpuBounds = L.latLngBounds(
+      [31.2430, 75.6915],
+      [31.2625, 75.7155]
+    );
+
+    const map = L.map('map', {
+      center: lpuCoords,
+      zoom: 15,
+      minZoom: 14,
+      maxZoom: 19,
+      maxBounds: lpuBounds,
+      maxBoundsViscosity: 1.0
+    });
+
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
+
+    // 2. Campus Perimeter Cutout Mask
+    const outerWorld = [
+      [30.0, 74.0],
+      [30.0, 77.0],
+      [33.0, 77.0],
+      [33.0, 74.0]
+    ];
+
+    const lpuPerimeter = [
+      [31.2458, 75.6982],
+      [31.2468, 75.7095],
+      [31.2535, 75.7138],
+      [31.2608, 75.7105],
+      [31.2610, 75.7005],
+      [31.2578, 75.6958],
+      [31.2505, 75.6952]
+    ];
+
+    L.polygon([outerWorld, lpuPerimeter], {
+      color: '#e11d48',
+      weight: 2.5,
+      fillColor: '#0f172a',
+      fillOpacity: 0.65,
+      interactive: false
+    }).addTo(map);
+
+    // 3. LPU Campus Blocks Directory (with optional spotlight metadata)
+    const lpuBlocks = [
+      { id: "Uni-hospital", name: "Uni-Hospital", coords: [31.258024242602268, 75.70681769705185], category: "Medical", facilities: "24/7 emergency care, OPD consultation, pharmacy, and ambulance dispatch.", landmark: "Near Main Gate entrance and Blocks 1 & 2.", tip: "Carry your student ID card or UMS registration number for quick OPD registration." },
+      { id: "Block-30", name: "Block-30 – Admission Wing", coords: [31.2528, 75.7042], category: "Admin", facilities: "Admissions counseling, document verification, and student helpdesks.", landmark: "Front Plaza beside Block 29 and Block 31.", tip: "Arrive early during semester start weeks to avoid verification queues." },
+      { id: "Block-31", name: "Block-31 – Admission Wing", coords: [31.252698180884554, 75.70460744210774], category: "Admin", facilities: "International admissions, scholarship desks, and administrative offices.", landmark: "Adjacent to Block 30 and Block 32.", tip: "Connected directly to the central administrative plaza." },
+      { id: "13", name: "Block 13 – Division of Student Welfare (DSW)", coords: [31.25510982375762, 75.70594540435397], category: "Student Life", facilities: "Student clubs, cultural event registration, lost & found, and DSW offices.", landmark: "Right next to Uni-Mall and Block 14.", tip: "Best place to visit for fest passes, club memberships, and event permissions." },
+      { id: "parking(CSE)", name: "Parking (CSE)", coords: [31.2526, 75.7055], category: "Transit", facilities: "Two-wheeler and student vehicle parking zone for central academic blocks.", landmark: "Between Block 32 and CSE Blocks 33–34.", tip: "Keep your LPU vehicle sticker visible for smooth security checks." },
+      { id: "unimall", name: "Uni-Mall & Food Court", coords: [31.254968113610094, 75.70450198687695], category: "Food & Retail", facilities: "Multi-cuisine food court, ATMs, stationery/print shops, salon, and grocery stores.", landmark: "Central hub between academic blocks and Girls' Hostels.", tip: "Peak lunch rush is 1:00 PM – 2:00 PM; visit 15 minutes early for shorter queues." },
+      { id: "Auditorium", name: "Shanti Devi Mittal Auditorium", coords: [31.25210629049181, 75.70410432830535], category: "Events", facilities: "Main indoor auditorium for convocations, concerts, and national conferences.", landmark: "Beside Blocks 35–37 and Central Library.", tip: "Use the designated gate number printed on your event pass for entry." },
+      { id: "school_of_business", name: "Mittal School of Business (Block 14)", coords: [31.2544, 75.7058], category: "Academic", facilities: "Management classrooms, seminar halls, trading lab, and faculty offices.", landmark: "Next to Uni-Mall and Block 13.", tip: "E-rickshaws drop right outside the Block 14 main walkway." },
+      { id: "25-28", name: "Blocks 25–28 – AI & Emerging Technologies", coords: [31.252852071778854, 75.70322272522039], category: "Academic", facilities: "AI/ML computing labs, classrooms, and project studios.", landmark: "Opposite RoboPark and near Block 29.", tip: "Check whether your room is in 25, 26, 27, or 28 before climbing stairs." },
+      { id: "33-34", name: "Blocks 33–34 – Computer Science (CSE)", coords: [31.251685193361375, 75.70468565700244], category: "Academic", facilities: "CSE/BCA/MCA lecture halls, programming labs, and faculty cabins.", landmark: "Beside CSE Parking, RoboPark, and Central Library (Block 37).", tip: "Use the central atrium stairs or side lifts; check wing boards before heading up." },
+      { id: "35-37", name: "Blocks 35–37 – Library, Auditorium & Electrical Eng.", coords: [31.251856437214975, 75.70376684552048], category: "Academic", facilities: "Central Library reading halls, digital library, and ECE/EEE labs.", landmark: "Adjacent to Block 34 and SDM Auditorium.", tip: "Carry your physical or digital LPU ID card to scan in at the library entrance." },
+      { id: "helipad", name: "Helipad", coords: [31.25442107124169, 75.70303378014219], category: "Landmark", facilities: "Open ceremonial ground and VIP landing zone.", landmark: "West of Uni-Mall and north of RoboPark.", tip: "Great open landmark to orient yourself when walking from hostels to academic blocks." },
+      { id: "Block-32", name: "Block-32 – Administration", coords: [31.252217016970096, 75.7047908964903], category: "Admin", facilities: "Accounts, examination cell counters, and central administrative offices.", landmark: "Main arrival plaza near Blocks 30–31.", tip: "Major e-rickshaw pickup and drop-off hub for the entire campus." },
+      { id: "Block-29", name: "Block-29 – Administration", coords: [31.252710489441963, 75.70415342789157], category: "Admin", facilities: "Administrative departments and student record services.", landmark: "Beside Block 30 and Blocks 25–28.", tip: "Accessible via the main pedestrian boulevard from the gate." },
+      { id: "Block-39,Innovaton", name: "Block-39 – Innovation Block", coords: [31.251148532935037, 75.7055739287971], category: "Academic", facilities: "Startup incubation center, prototyping labs, and hackathon workspaces.", landmark: "South of Block 34 and CSE Parking.", tip: "Hub for student startups, patent filing support, and design prototypes." },
+      { id: "Robopark", name: "RoboPark", coords: [31.253503145863696, 75.7033519654632], category: "Landmark", facilities: "Outdoor student hangout plaza with robotic sculptures and seating.", landmark: "Between Block 29, Helipad, and Uni-Mall.", tip: "Popular meeting point for group project discussions between lectures." },
+      { id: "BH-6", name: "Boys' Hostel 6 (BH-6)", coords: [31.248258897470517, 75.70370025808336], category: "Hostel", facilities: "Residential rooms, mess hall, night canteen, and indoor common room.", landmark: "Near BH-5 and Blocks 55–57.", tip: "About a 10–12 minute walk to central academic blocks; e-rickshaws pass nearby." },
+      { id: "Block- 55-57", name: "Blocks 55–57", coords: [31.2466693303191, 75.7038124562881], category: "Academic", facilities: "Agriculture, Biosciences, and specialized research laboratories.", landmark: "South campus zone past BH-6.", tip: "Take an e-rickshaw from Main Gate or Block 32 if you have back-to-back classes." },
+      { id: "Cricket Ground", name: "Cricket Ground", coords: [31.247765586406025, 75.70041445343732], category: "Sports", facilities: "Full-size cricket pitch, practice nets, and spectator seating.", landmark: "Beside BH-3, BH-4, and Basketball Court.", tip: "Hosts inter-hostel tournaments and university sports trials." },
+      { id: "GH- 1-4", name: "Girls' Hostels 1–4 (GH 1–4)", coords: [31.256271550249195, 75.70464394588915], category: "Hostel", facilities: "Residential wings, mess facilities, tuck shops, and reading rooms.", landmark: "Just north of Uni-Mall.", tip: "Very close to Uni-Mall and Block 14—walking is faster than waiting for a shuttle." },
+      { id: "GH- 11-12", name: "Girls' Hostels 11–12 (GH 11–12)", coords: [31.256662053213603, 75.70473210162307], category: "Hostel", facilities: "Residential complex with dining hall and daily essentials store.", landmark: "Adjacent to GH 1–4.", tip: "Use the pedestrian path past GH 1–4 to reach Uni-Mall in under 4 minutes." },
+      { id: "GH- 5", name: "Girls' Hostel 5 (GH-5)", coords: [31.25369420165362, 75.70080023171786], category: "Hostel", facilities: "Residential wing, mess, and common study area.", landmark: "Near School of Film and Student Apartments.", tip: "Short walk east brings you straight to RoboPark and Uni-Mall." },
+      { id: "Block 1&2", name: "Blocks 1 & 2 – Fashion & Textile", coords: [31.258304123197362, 75.70789143992525], category: "Academic", facilities: "Design studios, garment construction labs, and exhibition galleries.", landmark: "Near Main Gate Parking and Uni-Hospital.", tip: "Closest academic blocks to the GT Road entrance." },
+      { id: "Parking", name: "LPU Main Gate Parking", coords: [31.259531955597776, 75.70568564656723], category: "Transit", facilities: "Visitor parking, main security gate, and campus e-rickshaw terminal.", landmark: "North entrance off Jalandhar–Delhi GT Road.", tip: "Best drop-off pin to share with parents or external cab drivers." },
+      { id: "BH- 11-13", name: "Boys' Hostels 11–13 (BH 11–13)", coords: [31.249234283479648, 75.70710310862117], category: "Hostel", facilities: "Residential towers, mess halls, and convenience kiosks.", landmark: "Southeast residential sector.", tip: "Catch an e-rickshaw from the hostel stand during peak morning lecture hours." },
+      { id: "Schol of Film", name: "School of Film", coords: [31.25465879665405, 75.70132097614915], category: "Academic", facilities: "Sound stages, editing suites, photography studios, and screening rooms.", landmark: "Between Helipad and GH-5.", tip: "Easily reachable via the walkway west of RoboPark." },
+      { id: "BH1", name: "Boys' Hostel 1 (BH-1)", coords: [31.25128753452139, 75.70016097847153], category: "Hostel", facilities: "Hostel rooms, mess hall, gym access, and adjacent food court.", landmark: "Near Sports Complex and Student Apartments.", tip: "Major e-rickshaw boarding point for students heading toward CSE and Uni-Mall." },
+      { id: "BH2", name: "Boys' Hostel 2 (BH-2)", coords: [31.249894411706826, 75.70089086346619], category: "Hostel", facilities: "Residential wings, mess, and night canteen.", landmark: "Between BH-1 and Sports Complex.", tip: "Grab quick snacks at the BH-1 Food Court right next door." },
+      { id: "BH3", name: "Boys' Hostel 3 (BH-3)", coords: [31.24971853034436, 75.70013654538313], category: "Hostel", facilities: "Residential rooms, mess hall, and indoor games room.", landmark: "Beside BH-2 and BH-4.", tip: "Use the main hostel road for direct e-rickshaw access." },
+      { id: "BH4", name: "Boys' Hostel 4 (BH-4)", coords: [31.248734492655096, 75.69970778168657], category: "Hostel", facilities: "Residential complex with mess and evening food stalls.", landmark: "Near Cricket Ground and BH-3.", tip: "Allow 12–15 minutes if walking to central academic blocks." },
+      { id: "FOOD COURT BH1", name: "Food Court (BH-1)", coords: [31.250555026599482, 75.70021804307413], category: "Food & Retail", facilities: "Late-evening food kiosks, juice bars, tea stalls, and print shop.", landmark: "Between BH-1 and BH-3.", tip: "Popular evening hangout spot for hostel residents." },
+      { id: "SPORTS COMPLEX", name: "Sports Complex", coords: [31.250917084346913, 75.70138127371577], category: "Sports", facilities: "Indoor courts, gym, athletics track, and sports department offices.", landmark: "East of BH-1 and south of Student Apartments.", tip: "Carry sports shoes and student ID for court bookings." },
+      { id: "BH5", name: "Boys' Hostel 5 (BH-5)", coords: [31.24876263613209, 75.7032535163135], category: "Hostel", facilities: "Residential blocks, mess hall, and tuck shop.", landmark: "Between Basketball Court and BH-6.", tip: "Walk north past GH-7 for a direct route toward Block 34." },
+      { id: "BASKETBALL COURT", name: "Basketball Court", coords: [31.248677671086657, 75.70204284795751], category: "Sports", facilities: "Outdoor floodlit basketball courts.", landmark: "Between BH-5 and Cricket Ground.", tip: "Active in the evenings for casual games and practice." },
+      { id: "STUDENT APARTMENT", name: "Student Apartments", coords: [31.252022146356627, 75.70144654869677], category: "Hostel", facilities: "Apartment-style residential suites and convenience store.", landmark: "North of Sports Complex and west of GH-7.", tip: "Central location with quick walking access to both hostels and academic blocks." },
+      { id: "GH7", name: "Girls' Hostel 7 (GH-7)", coords: [31.251489200969402, 75.70255783367703], category: "Hostel", facilities: "Residential wing, dining hall, and indoor amenities.", landmark: "Between Student Apartments and Blocks 35–37.", tip: "Very short walk to the Central Library and Block 34." }
+    ];
+
+    const fromSelect = document.getElementById("fromBlock");
+    const toSelect = document.getElementById("toBlock");
+    const markers = {};
+
+    // Update Spotlight Card below the map
+    function updateSpotlight(blockId) {
+      const block = lpuBlocks.find(b => b.id === blockId);
+      if (!block) return;
+
+      document.getElementById("spot-title").textContent = block.name;
+      document.getElementById("spot-tag").textContent = block.category || "Campus Zone";
+      document.getElementById("spot-facilities").textContent = block.facilities || "Campus academic, residential, or utility facility.";
+      document.getElementById("spot-landmark").textContent = block.landmark || "Located inside the LPU Phagwara campus perimeter.";
+      document.getElementById("spot-tip").textContent = block.tip || "Follow campus signage or use e-rickshaws along the main ring road.";
+    }
+
+    // Quick-route chip handler
+    function quickRoute(fromId, toId) {
+      fromSelect.value = fromId;
+      toSelect.value = toId;
+      showRoute();
+    }
+
+    // Build interactive popup with "Set Start" & "Set Destination"
+    function buildPopupContent(block) {
+      const container = document.createElement("div");
+      container.innerHTML = `<b>${block.name}</b>`;
+
+      const actions = document.createElement("div");
+      actions.className = "popup-actions";
+
+      const startBtn = document.createElement("button");
+      startBtn.className = "popup-btn";
+      startBtn.textContent = "Set Start";
+      startBtn.onclick = () => {
+        fromSelect.value = block.id;
+        map.closePopup();
+        showRoute();
+      };
+
+      const destBtn = document.createElement("button");
+      destBtn.className = "popup-btn popup-btn-dest";
+      destBtn.textContent = "Set Destination";
+      destBtn.onclick = () => {
+        toSelect.value = block.id;
+        map.closePopup();
+        showRoute();
+      };
+
+      actions.appendChild(startBtn);
+      actions.appendChild(destBtn);
+      container.appendChild(actions);
+      return container;
+    }
+
+    // Populate dropdowns and add markers
+    lpuBlocks.forEach(block => {
+      fromSelect.add(new Option(block.name, block.id));
+      toSelect.add(new Option(block.name, block.id));
+
+      const marker = L.circleMarker(block.coords, {
+        radius: 6,
+        fillColor: "#2563eb",
+        color: "#ffffff",
+        weight: 2,
+        fillOpacity: 0.9
+      }).addTo(map).bindPopup(() => buildPopupContent(block));
+
+      markers[block.id] = marker;
+    });
+
+    fromSelect.value = "Block-32";
+    toSelect.value = "33-34";
+    updateSpotlight("33-34");
+
+    let activeRouteLayer = L.layerGroup().addTo(map);
+    let userLocationMarker = null;
+
+    // Live GPS "Locate Me"
+    function locateUser() {
+      const infoBox = document.getElementById("route-info");
+      if (!navigator.geolocation) {
+        infoBox.innerHTML = "Geolocation is not supported by your browser.";
+        return;
+      }
+
+      infoBox.innerHTML = "📡 Locating your position on campus...";
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const userCoords = [pos.coords.latitude, pos.coords.longitude];
+
+          if (!lpuBounds.contains(userCoords)) {
+            infoBox.innerHTML = "⚠️ You appear to be outside the LPU campus perimeter. Select a campus block manually.";
+            return;
+          }
+
+          const gpsId = "USER_GPS";
+          const existing = lpuBlocks.find(b => b.id === gpsId);
+
+          if (existing) {
+            existing.coords = userCoords;
+          } else {
+            lpuBlocks.unshift({
+              id: gpsId,
+              name: "📍 My Current Location",
+              coords: userCoords,
+              category: "Live GPS",
+              facilities: "Your current live GPS coordinates on campus.",
+              landmark: "Detected via browser geolocation.",
+              tip: "Select any destination block to get walking directions from where you stand."
+            });
+            fromSelect.add(new Option("📍 My Current Location", gpsId), 0);
+            toSelect.add(new Option("📍 My Current Location", gpsId), 0);
+          }
+
+          if (userLocationMarker) {
+            map.removeLayer(userLocationMarker);
+          }
+
+          userLocationMarker = L.circleMarker(userCoords, {
+            radius: 8,
+            fillColor: "#16a34a",
+            color: "#ffffff",
+            weight: 3,
+            fillOpacity: 1
+          }).addTo(map).bindPopup("<b>📍 You are here</b>").openPopup();
+
+          markers[gpsId] = userLocationMarker;
+          fromSelect.value = gpsId;
+          showRoute();
+        },
+        () => {
+          infoBox.innerHTML = "⚠️ Location access denied or unavailable. Please allow GPS permissions in your browser.";
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    }
+
+    function swapBlocks() {
+      const temp = fromSelect.value;
+      fromSelect.value = toSelect.value;
+      toSelect.value = temp;
+      showRoute();
+    }
+
+    // Live Pedestrian Road Routing via OSRM (with offline fallback)
+    async function showRoute() {
+      const start = lpuBlocks.find(b => b.id === fromSelect.value);
+      const end = lpuBlocks.find(b => b.id === toSelect.value);
+      const infoBox = document.getElementById("route-info");
+
+      if (!start || !end) return;
+
+      updateSpotlight(end.id);
+
+      if (start.id === end.id) {
+        infoBox.innerHTML = `You are already at <b>${start.name}</b>.`;
+        map.flyTo(start.coords, 17);
+        if (markers[start.id]) markers[start.id].openPopup();
+        return;
+      }
+
+      activeRouteLayer.clearLayers();
+      infoBox.innerHTML = "🚶 Finding best walking path along campus roads...";
+
+      L.marker(start.coords)
+        .addTo(activeRouteLayer)
+        .bindPopup(`<b>Start:</b> ${start.name}`);
+
+      L.marker(end.coords)
+        .addTo(activeRouteLayer)
+        .bindPopup(`<b>Destination:</b> ${end.name}`)
+        .openPopup();
+
+      const startLabel = start.name.split("–")[0].trim();
+      const endLabel = end.name.split("–")[0].trim();
+
+      try {
+        const osrmUrl = `https://router.project-osrm.org/route/v1/foot/${start.coords[1]},${start.coords[0]};${end.coords[1]},${end.coords[0]}?overview=full&geometries=geojson`;
+        const response = await fetch(osrmUrl);
+
+        if (!response.ok) throw new Error("OSRM network error");
+        const data = await response.json();
+
+        if (!data.routes || data.routes.length === 0) {
+          throw new Error("No road route found");
+        }
+
+        const route = data.routes[0];
+        const roadLatLngs = route.geometry.coordinates.map(coord => [coord[1], coord[0]]);
+
+        const routeLine = L.polyline(roadLatLngs, {
+          color: "#e11d48",
+          weight: 5,
+          opacity: 0.9
+        }).addTo(activeRouteLayer);
+
+        map.fitBounds(routeLine.getBounds(), { padding: [50, 50] });
+
+        const walkMeters = Math.round(route.distance);
+        const walkMinutes = Math.max(1, Math.round(walkMeters / 80));
+
+        infoBox.innerHTML = `
+          <b>From:</b> ${startLabel} &rarr; <b>To:</b> ${endLabel}<br>
+          Road Walk Distance: <b>${walkMeters} meters</b> (<b>~${walkMinutes} min</b>)
+        `;
+      } catch (err) {
+        const fallbackLine = L.polyline([start.coords, end.coords], {
+          color: "#e11d48",
+          weight: 5,
+          dashArray: "10, 8"
+        }).addTo(activeRouteLayer);
+
+        map.fitBounds(fallbackLine.getBounds(), { padding: [50, 50] });
+
+        const straightMeters = map.distance(start.coords, end.coords);
+        const walkMeters = Math.round(straightMeters * 1.3);
+        const walkMinutes = Math.max(1, Math.round(walkMeters / 80));
+
+        infoBox.innerHTML = `
+          <b>From:</b> ${startLabel} &rarr; <b>To:</b> ${endLabel}<br>
+          Estimated Walk (Direct): <b>~${walkMeters} meters</b> (<b>${walkMinutes} min</b>)
+        `;
+      }
+    }
+  </script>
+</body>
+</html>
